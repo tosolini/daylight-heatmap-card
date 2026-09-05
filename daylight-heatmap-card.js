@@ -57,6 +57,40 @@
   function dayOfYearFromDate(dt) {
     return dayOfYear(dt.getFullYear(), dt.getMonth(), dt.getDate());
   }
+  // Ora del tramonto in minuti da 00:00 UTC (algoritmo NOAA, zenit 90.833°).
+  // null = sole che non tramonta/sorge (giorno/notte polare).
+  function sunsetUTCMinutes(latDeg, lngDeg, date) {
+    const rad = Math.PI / 180;
+    const N = dayOfYearFromDate(date);
+    const lngHour = lngDeg / 15;
+    const t = N + (18 - lngHour) / 24;
+    const M = 0.9856 * t - 3.289;
+    let L = M + 1.916 * Math.sin(M * rad) + 0.020 * Math.sin(2 * M * rad) + 282.634;
+    L = ((L % 360) + 360) % 360;
+    let RA = Math.atan(0.91764 * Math.tan(L * rad)) / rad;
+    RA = ((RA % 360) + 360) % 360;
+    RA += Math.floor(L / 90) * 90 - Math.floor(RA / 90) * 90;
+    RA /= 15;
+    const sinDec = 0.39782 * Math.sin(L * rad);
+    const cosDec = Math.cos(Math.asin(sinDec));
+    const cosH = (Math.cos(90.833 * rad) - sinDec * Math.sin(latDeg * rad)) / (cosDec * Math.cos(latDeg * rad));
+    if (cosH > 1 || cosH < -1) return null;
+    const H = Math.acos(cosH) / rad / 15;
+    const T = H + RA - 0.06571 * t - 6.622;
+    return (((T - lngHour) % 24 + 24) % 24) * 60;
+  }
+
+  // "21:13" nel fuso di HA (DST automatico via Intl). "—" se non tramonta.
+  function fmtSunset(latDeg, lngDeg, date, timeZone, locale) {
+    const mins = sunsetUTCMinutes(latDeg, lngDeg, date);
+    if (mins === null) return "—";
+    const utc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) + Math.round(mins) * 60000);
+    try {
+      return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "it-IT", { hour: "2-digit", minute: "2-digit", timeZone }).format(utc);
+    } catch (e) {
+      return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "it-IT", { hour: "2-digit", minute: "2-digit" }).format(utc);
+    }
+  }
 
   function isLeap(y) {
     return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
@@ -120,23 +154,15 @@
     }
 
     static getStubConfig() {
-      return { title: "Luce disponibile", mode: "sunrise_sunset", view: "year", days: 7, show_hours: true, show_delta: true };
-    }
-    static getConfigElement() {
-      return document.createElement("daylight-heatmap-card-editor");
-    }
-
-    getCardSize() {
-      return 6;
+      return { title: "Luce disponibile", mode: "sunrise_sunset", view: "year", days: 7, show_hours: true, show_delta: true, show_sunset: true };
     }
 
     setConfig(config) {
       if (!config) throw new Error("Config mancante");
       this.config = Object.assign(
-        { mode: "sunrise_sunset", view: "year", days: 7, show_hours: true, show_delta: true, lang: "it" },
+        { mode: "sunrise_sunset", view: "year", days: 7, show_hours: true, show_delta: true, show_sunset: true, lang: "it" },
         config
       );
-      if (!ZENITH[this.config.mode]) this.config.mode = "sunrise_sunset";
       if (this.config.view !== "week" && this.config.view !== "year") this.config.view = "year";
       this.config.days = Math.min(14, Math.max(3, Number(this.config.days) || 7));
       this._offset = 0;
@@ -162,6 +188,24 @@
       return Number.isFinite(lat) ? lat : 45.46;
     }
 
+    _longitude() {
+      if (this.config.longitude !== undefined && this.config.longitude !== null && this.config.longitude !== "") {
+        const v = Number(this.config.longitude);
+        if (Number.isFinite(v) && v >= -180 && v <= 180) return v;
+      }
+      const lng = this._hass && this._hass.config && this._hass.config.longitude;
+      return Number.isFinite(lng) ? lng : 9.19; // fallback Milano
+    }
+
+    _timeZone() {
+      const tz = this._hass && this._hass.config && this._hass.config.time_zone;
+      if (typeof tz === "string" && tz) return tz;
+      try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone;
+      } catch (e) {
+        return undefined;
+      }
+    }
     _render() {
       if (!this.shadowRoot || !this.config) return;
       if (this._view() === "week") this._renderWeek();
@@ -297,7 +341,10 @@
       const months = MONTH_SHORT[lang];
       const wdays = WEEKDAY_SHORT[lang];
       const n = this.config.days;
+      const showSunset = this.config.show_sunset !== false;
       const showDelta = this.config.show_delta !== false;
+      const lng = this._longitude();
+      const tz = this._timeZone();
       const modeLabel = (MODE_LABEL[this.config.mode] || MODE_LABEL.sunrise_sunset)[lang];
       const today = new Date();
 
@@ -321,9 +368,12 @@
         if (i > 0) dd = vals[i] - vals[i - 1];
         else dd = mins - daylightMinutes(lat, dayOfYearFromDate(addDays(dt, -1)), zenith);
         const deltaTxt = showDelta && dd !== 0 ? `<div class="delta ${dd > 0 ? "up" : "down"}">${dd > 0 ? "+" : "−"}${Math.abs(dd)}′</div>` : `<div class="delta">·</div>`;
-        return `<div class="wcell${isToday ? " today" : ""}${isFuture ? " future" : ""}" style="background:${colorFor(mins, smin, smax)};color:${textColor(mins, smin, smax)}" title="${wdays[dt.getDay()]} ${dt.getDate()} ${months[dt.getMonth()]}: ${fmtHM(mins)} (${modeLabel})">
+        const sunset = showSunset ? fmtSunset(lat, lng, dt, tz, lang) : null;
+        const sunsetLbl = lang === "en" ? "Sunset" : "Tramonto";
+        return `<div class="wcell${isToday ? " today" : ""}${isFuture ? " future" : ""}" style="background:${colorFor(mins, smin, smax)};color:${textColor(mins, smin, smax)}" title="${wdays[dt.getDay()]} ${dt.getDate()} ${months[dt.getMonth()]}: ${fmtHM(mins)} (${modeLabel})${sunset ? `, ${sunsetLbl.toLowerCase()} ${sunset}` : ""}">
           <div class="wd">${wdays[dt.getDay()]}${isToday ? " •" : ""}</div>
           <div class="dt">${dt.getDate()}/${dt.getMonth() + 1}</div>
+          ${sunset ? `<div class="sunset"><span class="tag" title="${sunsetLbl}">↓ ${sunset}</span></div>` : ""}
           <div class="hm">${fmtHM(mins)}</div>${deltaTxt}</div>`;
       }).join("");
 
@@ -335,6 +385,9 @@
         .wd { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; opacity:.85; }
         .dt { font-size:10px; opacity:.7; }
         .hm { font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:2px; }
+        .sunset { margin-top:4px; }
+        .sunset .tag { display:inline-block; font-size:16px; font-weight:600; font-variant-numeric:tabular-nums;
+          border:1px solid currentColor; border-radius:999px; padding:0 10px; line-height:1.5; opacity:.92; white-space:nowrap; }
         .delta { font-size:10px; opacity:.85; font-variant-numeric:tabular-nums; }
         .delta.up::before { content:"▲ "; font-size:8px; }
         .delta.down::before { content:"▼ "; font-size:8px; }
@@ -388,9 +441,11 @@
         astronomical: { it: "Crepuscolo astronomico", en: "Astronomical twilight" },
         lang: { it: "Lingua", en: "Language" },
         latitude: { it: "Latitudine (vuoto = quella di HA)", en: "Latitude (empty = HA one)" },
+        longitude: { it: "Longitudine (vuoto = quella di HA)", en: "Longitude (empty = HA one)" },
         yearFix: { it: "Anno fisso (vuoto = corrente)", en: "Fixed year (empty = current)" },
         show_hours: { it: "Mostra ore:minuti", en: "Show hours:minutes" },
         show_delta: { it: "Mostra variazione giornaliera", en: "Show daily change" },
+        show_sunset: { it: "Mostra ora del tramonto (vista settimana)", en: "Show sunset time (week view)" },
       };
       return (STR[key] || {})[lang] || key;
     }
@@ -423,18 +478,19 @@
             <mwc-list-item value="civil">${this._t("civil")}</mwc-list-item>
             <mwc-list-item value="nautical">${this._t("nautical")}</mwc-list-item>
             <mwc-list-item value="astronomical">${this._t("astronomical")}</mwc-list-item>
-          </ha-select>
-        </div>
         <div class="row2">
           <ha-textfield id="fLat" label="${this._t("latitude")}" type="number" step="0.01" min="-90" max="90" value="${c.latitude ?? ""}"></ha-textfield>
-          <ha-textfield id="fYear" label="${this._t("yearFix")}" type="number" step="1" value="${Number.isInteger(c.year) ? c.year : ""}"></ha-textfield>
+          <ha-textfield id="fLng" label="${this._t("longitude")}" type="number" step="0.01" min="-180" max="180" value="${c.longitude ?? ""}"></ha-textfield>
         </div>
+        <ha-textfield id="fYear" label="${this._t("yearFix")}" type="number" step="1" value="${Number.isInteger(c.year) ? c.year : ""}"></ha-textfield>
         <div class="switch"><span>${this._t("show_hours")}</span><ha-switch id="fHours"></ha-switch></div>
         <div class="switch"><span>${this._t("show_delta")}</span><ha-switch id="fDelta"></ha-switch></div>
+        <div class="switch"><span>${this._t("show_sunset")}</span><ha-switch id="fSun"></ha-switch></div>
       </div>`;
       const $ = (id) => this.shadowRoot.getElementById(id);
       $("fHours").checked = c.show_hours !== false;
       $("fDelta").checked = c.show_delta !== false;
+      $("fSun").checked = c.show_sunset !== false;
       $("fTitle").addEventListener("input", (e) => this._fire({ title: e.target.value }));
       $("fView").addEventListener("change", (e) => this._fire({ view: e.target.value }));
       $("fLang").addEventListener("change", (e) => this._fire({ lang: e.target.value }));
@@ -449,6 +505,12 @@
         else { const v = Number(e.target.value); if (Number.isFinite(v)) patch.latitude = Math.min(90, Math.max(-90, v)); }
         this._fire(patch, ["latitude"]);
       });
+      $("fLng").addEventListener("input", (e) => {
+        const patch = {};
+        if (e.target.value === "" || e.target.value === null) patch.longitude = undefined;
+        else { const v = Number(e.target.value); if (Number.isFinite(v)) patch.longitude = Math.min(180, Math.max(-180, v)); }
+        this._fire(patch, ["longitude"]);
+      });
       $("fYear").addEventListener("input", (e) => {
         const patch = {};
         if (e.target.value === "" || e.target.value === null) patch.year = undefined;
@@ -457,6 +519,7 @@
       });
       $("fHours").addEventListener("change", (e) => this._fire({ show_hours: e.target.checked }));
       $("fDelta").addEventListener("change", (e) => this._fire({ show_delta: e.target.checked }));
+      $("fSun").addEventListener("change", (e) => this._fire({ show_sunset: e.target.checked }));
       this._built = true;
     }
 
@@ -472,8 +535,10 @@
       set("fMode", "value", c.mode || "sunrise_sunset");
       set("fLat", "value", c.latitude ?? "");
       set("fYear", "value", Number.isInteger(c.year) ? c.year : "");
+      set("fLng", "value", c.longitude ?? "");
       set("fHours", "checked", c.show_hours !== false);
       set("fDelta", "checked", c.show_delta !== false);
+      set("fSun", "checked", c.show_sunset !== false);
     }
 
     _fire(patch, dropIfUndefined) {
