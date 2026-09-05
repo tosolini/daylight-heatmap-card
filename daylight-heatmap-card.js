@@ -373,7 +373,7 @@
         return `<div class="wcell${isToday ? " today" : ""}${isFuture ? " future" : ""}" style="background:${colorFor(mins, smin, smax)};color:${textColor(mins, smin, smax)}" title="${wdays[dt.getDay()]} ${dt.getDate()} ${months[dt.getMonth()]}: ${fmtHM(mins)} (${modeLabel})${sunset ? `, ${sunsetLbl.toLowerCase()} ${sunset}` : ""}">
           <div class="wd">${wdays[dt.getDay()]}${isToday ? " •" : ""}</div>
           <div class="dt">${dt.getDate()}/${dt.getMonth() + 1}</div>
-          ${sunset ? `<div class="sunset"><span class="tag" title="${sunsetLbl}">↓ ${sunset}</span></div>` : ""}
+          ${sunset ? `<div class="sunset" title="${sunsetLbl}">↓ ${sunset}</div>` : ""}
           <div class="hm">${fmtHM(mins)}</div>${deltaTxt}</div>`;
       }).join("");
 
@@ -385,12 +385,9 @@
         .wd { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; opacity:.85; }
         .dt { font-size:10px; opacity:.7; }
         .hm { font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:3px; }
-        .sunset { margin-top:5px; }
-        .sunset .tag { display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis;
-          font-size:11px; font-weight:500; font-variant-numeric:tabular-nums;
-          border:1px solid currentColor; border-radius:999px; padding:1px 6px; line-height:1.4; opacity:.75; white-space:nowrap; }
+        .sunset { margin-top:5px; font-size:12px; font-weight:500; opacity:.8; font-variant-numeric:tabular-nums; white-space:nowrap; }
         .delta { font-size:10px; opacity:.85; font-variant-numeric:tabular-nums; }
-        @media (max-width:640px){ .hm { font-size:15px; } .sunset .tag { font-size:10px; padding:1px 4px; } }
+        @media (max-width:640px){ .hm { font-size:15px; } .sunset { font-size:11px; } }
         .delta.up::before { content:"▲ "; font-size:8px; }
         .delta.down::before { content:"▼ "; font-size:8px; }
       </style>`;
@@ -456,43 +453,51 @@
       const c = this._config;
       this.shadowRoot.innerHTML = `
       <style>
-        .form { display:grid; gap:12px; padding:4px 0; }
+        .form { display:grid; gap:12px; padding:4px 0; color:var(--primary-text-color,inherit); }
         .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-        ha-select, ha-textfield { width:100%; display:block; }
+        label.f { display:grid; gap:4px; font-size:12px; opacity:.9; }
+        label.f > span { opacity:.75; }
+        input, select { width:100%; box-sizing:border-box; padding:8px; border-radius:6px;
+          border:1px solid var(--divider-color,#e0e0e0);
+          background:var(--secondary-background-color,transparent);
+          color:var(--primary-text-color,inherit); font-size:14px; }
         .switch { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:14px; }
+        .switch input { width:auto; width:18px; height:18px; accent-color:var(--primary-color,#03a9f4); }
       </style>
       <div class="form">
-        <ha-textfield id="fTitle" label="${this._t("title")}" value="${c.title || ""}"></ha-textfield>
+        <label class="f"><span>${this._t("title")}</span><input id="fTitle" type="text" value="${c.title || ""}"></label>
         <div class="row2">
-          <ha-select id="fView" label="${this._t("view")}" value="${c.view === "week" ? "week" : "year"}">
-            <mwc-list-item value="year">${this._t("year")}</mwc-list-item>
-            <mwc-list-item value="week">${this._t("week")}</mwc-list-item>
-          </ha-select>
-          <ha-select id="fLang" label="${this._t("lang")}" value="${c.lang === "en" ? "en" : "it"}">
-            <mwc-list-item value="it">Italiano</mwc-list-item>
-            <mwc-list-item value="en">English</mwc-list-item>
-          </ha-select>
+          <label class="f"><span>${this._t("view")}</span><select id="fView">
+            <option value="year">${this._t("year")}</option>
+            <option value="week">${this._t("week")}</option>
+          </select></label>
+          <label class="f"><span>${this._t("lang")}</span><select id="fLang">
+            <option value="it">Italiano</option>
+            <option value="en">English</option>
+          </select></label>
         </div>
         <div class="row2">
-          <ha-textfield id="fDays" label="${this._t("days")}" type="number" min="3" max="14" value="${c.days || 7}"></ha-textfield>
-          <ha-select id="fMode" label="${this._t("mode")}" value="${c.mode || "sunrise_sunset"}">
-            <mwc-list-item value="sunrise_sunset">${this._t("sunrise_sunset")}</mwc-list-item>
-            <mwc-list-item value="civil">${this._t("civil")}</mwc-list-item>
-            <mwc-list-item value="nautical">${this._t("nautical")}</mwc-list-item>
-            <mwc-list-item value="astronomical">${this._t("astronomical")}</mwc-list-item>
-        <div class="row2">
-          <ha-textfield id="fLat" label="${this._t("latitude")}" type="number" step="0.01" min="-90" max="90" value="${c.latitude ?? ""}"></ha-textfield>
-          <ha-textfield id="fLng" label="${this._t("longitude")}" type="number" step="0.01" min="-180" max="180" value="${c.longitude ?? ""}"></ha-textfield>
+          <label class="f"><span>${this._t("days")}</span><input id="fDays" type="number" min="3" max="14" step="1"></label>
+          <label class="f"><span>${this._t("mode")}</span><select id="fMode">
+            <option value="sunrise_sunset">${this._t("sunrise_sunset")}</option>
+            <option value="civil">${this._t("civil")}</option>
+            <option value="nautical">${this._t("nautical")}</option>
+            <option value="astronomical">${this._t("astronomical")}</option>
+          </select></label>
         </div>
-        <ha-textfield id="fYear" label="${this._t("yearFix")}" type="number" step="1" value="${Number.isInteger(c.year) ? c.year : ""}"></ha-textfield>
-        <div class="switch"><span>${this._t("show_hours")}</span><ha-switch id="fHours"></ha-switch></div>
-        <div class="switch"><span>${this._t("show_delta")}</span><ha-switch id="fDelta"></ha-switch></div>
-        <div class="switch"><span>${this._t("show_sunset")}</span><ha-switch id="fSun"></ha-switch></div>
+        <div class="row2">
+          <label class="f"><span>${this._t("latitude")}</span><input id="fLat" type="number" step="0.01" min="-90" max="90"></label>
+          <label class="f"><span>${this._t("longitude")}</span><input id="fLng" type="number" step="0.01" min="-180" max="180"></label>
+        </div>
+        <label class="f"><span>${this._t("yearFix")}</span><input id="fYear" type="number" step="1"></label>
+        <div class="switch"><span>${this._t("show_hours")}</span><input id="fHours" type="checkbox"></div>
+        <div class="switch"><span>${this._t("show_delta")}</span><input id="fDelta" type="checkbox"></div>
+        <div class="switch"><span>${this._t("show_sunset")}</span><input id="fSun" type="checkbox"></div>
       </div>`;
       const $ = (id) => this.shadowRoot.getElementById(id);
-      $("fHours").checked = c.show_hours !== false;
-      $("fDelta").checked = c.show_delta !== false;
-      $("fSun").checked = c.show_sunset !== false;
+      // Valori iniziali via _sync (stessa logica del re-sync, non ruba il focus).
+      this._built = true;
+      this._sync();
       $("fTitle").addEventListener("input", (e) => this._fire({ title: e.target.value }));
       $("fView").addEventListener("change", (e) => this._fire({ view: e.target.value }));
       $("fLang").addEventListener("change", (e) => this._fire({ lang: e.target.value }));
@@ -522,7 +527,6 @@
       $("fHours").addEventListener("change", (e) => this._fire({ show_hours: e.target.checked }));
       $("fDelta").addEventListener("change", (e) => this._fire({ show_delta: e.target.checked }));
       $("fSun").addEventListener("change", (e) => this._fire({ show_sunset: e.target.checked }));
-      this._built = true;
     }
 
     _sync() {
