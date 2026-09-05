@@ -1,4 +1,4 @@
-/* Daylight Heatmap Card for Home Assistant — v0.2.1
+/* Daylight Heatmap Card for Home Assistant — v0.3.0
  * Luce disponibile giorno per giorno (ore:minuti), calcolo astronomico da
  * latitudine + giorno. Offline, passato e futuro, nessuna API esterna.
  *
@@ -121,6 +121,9 @@
 
     static getStubConfig() {
       return { title: "Luce disponibile", mode: "sunrise_sunset", view: "year", days: 7, show_hours: true, show_delta: true };
+    }
+    static getConfigElement() {
+      return document.createElement("daylight-heatmap-card-editor");
     }
 
     getCardSize() {
@@ -350,6 +353,139 @@
 
   if (!customElements.get("daylight-heatmap-card")) {
     customElements.define("daylight-heatmap-card", DaylightHeatmapCard);
+  }
+  /* Editor visuale: form nativo HA, niente YAML. HA chiama setConfig() e
+   * ascolta l'evento "config-changed" con la config aggiornata. */
+  class DaylightHeatmapCardEditor extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" });
+      this._built = false;
+    }
+
+    setConfig(config) {
+      this._config = Object.assign({}, config);
+      if (this._built) this._sync();
+      else this._build();
+    }
+
+    set hass(hass) {
+      this._hass = hass;
+    }
+
+    _t(key) {
+      const lang = (this._config && this._config.lang) === "en" ? "en" : "it";
+      const STR = {
+        title: { it: "Titolo", en: "Title" },
+        view: { it: "Vista iniziale", en: "Initial view" },
+        year: { it: "Anno (tabella 12 mesi)", en: "Year (12-month table)" },
+        week: { it: "Settimana (striscia giorni)", en: "Week (day strip)" },
+        days: { it: "Giorni per pagina (vista settimana)", en: "Days per page (week view)" },
+        mode: { it: "Riferimento luce", en: "Light reference" },
+        sunrise_sunset: { it: "Alba → tramonto", en: "Sunrise → sunset" },
+        civil: { it: "Crepuscolo civile (luce utile)", en: "Civil twilight (useful light)" },
+        nautical: { it: "Crepuscolo nautico", en: "Nautical twilight" },
+        astronomical: { it: "Crepuscolo astronomico", en: "Astronomical twilight" },
+        lang: { it: "Lingua", en: "Language" },
+        latitude: { it: "Latitudine (vuoto = quella di HA)", en: "Latitude (empty = HA one)" },
+        yearFix: { it: "Anno fisso (vuoto = corrente)", en: "Fixed year (empty = current)" },
+        show_hours: { it: "Mostra ore:minuti", en: "Show hours:minutes" },
+        show_delta: { it: "Mostra variazione giornaliera", en: "Show daily change" },
+      };
+      return (STR[key] || {})[lang] || key;
+    }
+
+    _build() {
+      const c = this._config;
+      this.shadowRoot.innerHTML = `
+      <style>
+        .form { display:grid; gap:12px; padding:4px 0; }
+        .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        ha-select, ha-textfield { width:100%; display:block; }
+        .switch { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:14px; }
+      </style>
+      <div class="form">
+        <ha-textfield id="fTitle" label="${this._t("title")}" value="${c.title || ""}"></ha-textfield>
+        <div class="row2">
+          <ha-select id="fView" label="${this._t("view")}" value="${c.view === "week" ? "week" : "year"}">
+            <mwc-list-item value="year">${this._t("year")}</mwc-list-item>
+            <mwc-list-item value="week">${this._t("week")}</mwc-list-item>
+          </ha-select>
+          <ha-select id="fLang" label="${this._t("lang")}" value="${c.lang === "en" ? "en" : "it"}">
+            <mwc-list-item value="it">Italiano</mwc-list-item>
+            <mwc-list-item value="en">English</mwc-list-item>
+          </ha-select>
+        </div>
+        <div class="row2">
+          <ha-textfield id="fDays" label="${this._t("days")}" type="number" min="3" max="14" value="${c.days || 7}"></ha-textfield>
+          <ha-select id="fMode" label="${this._t("mode")}" value="${c.mode || "sunrise_sunset"}">
+            <mwc-list-item value="sunrise_sunset">${this._t("sunrise_sunset")}</mwc-list-item>
+            <mwc-list-item value="civil">${this._t("civil")}</mwc-list-item>
+            <mwc-list-item value="nautical">${this._t("nautical")}</mwc-list-item>
+            <mwc-list-item value="astronomical">${this._t("astronomical")}</mwc-list-item>
+          </ha-select>
+        </div>
+        <div class="row2">
+          <ha-textfield id="fLat" label="${this._t("latitude")}" type="number" step="0.01" min="-90" max="90" value="${c.latitude ?? ""}"></ha-textfield>
+          <ha-textfield id="fYear" label="${this._t("yearFix")}" type="number" step="1" value="${Number.isInteger(c.year) ? c.year : ""}"></ha-textfield>
+        </div>
+        <div class="switch"><span>${this._t("show_hours")}</span><ha-switch id="fHours"></ha-switch></div>
+        <div class="switch"><span>${this._t("show_delta")}</span><ha-switch id="fDelta"></ha-switch></div>
+      </div>`;
+      const $ = (id) => this.shadowRoot.getElementById(id);
+      $("fHours").checked = c.show_hours !== false;
+      $("fDelta").checked = c.show_delta !== false;
+      $("fTitle").addEventListener("input", (e) => this._fire({ title: e.target.value }));
+      $("fView").addEventListener("change", (e) => this._fire({ view: e.target.value }));
+      $("fLang").addEventListener("change", (e) => this._fire({ lang: e.target.value }));
+      $("fMode").addEventListener("change", (e) => this._fire({ mode: e.target.value }));
+      $("fDays").addEventListener("input", (e) => {
+        const v = Math.min(14, Math.max(3, parseInt(e.target.value, 10) || 7));
+        this._fire({ days: v });
+      });
+      $("fLat").addEventListener("input", (e) => {
+        const patch = {};
+        if (e.target.value === "" || e.target.value === null) patch.latitude = undefined;
+        else { const v = Number(e.target.value); if (Number.isFinite(v)) patch.latitude = Math.min(90, Math.max(-90, v)); }
+        this._fire(patch, ["latitude"]);
+      });
+      $("fYear").addEventListener("input", (e) => {
+        const patch = {};
+        if (e.target.value === "" || e.target.value === null) patch.year = undefined;
+        else { const v = parseInt(e.target.value, 10); if (Number.isInteger(v)) patch.year = v; }
+        this._fire(patch, ["year"]);
+      });
+      $("fHours").addEventListener("change", (e) => this._fire({ show_hours: e.target.checked }));
+      $("fDelta").addEventListener("change", (e) => this._fire({ show_delta: e.target.checked }));
+      this._built = true;
+    }
+
+    _sync() {
+      // Aggiorna i valori senza ricostruire (non ruba il focus mentre si digita).
+      const c = this._config;
+      const $ = (id) => this.shadowRoot.getElementById(id);
+      const set = (id, prop, val) => { const el = $(id); if (el && document.activeElement !== el) el[prop] = val; };
+      set("fTitle", "value", c.title || "");
+      set("fView", "value", c.view === "week" ? "week" : "year");
+      set("fLang", "value", c.lang === "en" ? "en" : "it");
+      set("fDays", "value", c.days || 7);
+      set("fMode", "value", c.mode || "sunrise_sunset");
+      set("fLat", "value", c.latitude ?? "");
+      set("fYear", "value", Number.isInteger(c.year) ? c.year : "");
+      set("fHours", "checked", c.show_hours !== false);
+      set("fDelta", "checked", c.show_delta !== false);
+    }
+
+    _fire(patch, dropIfUndefined) {
+      const next = Object.assign({}, this._config, patch);
+      (dropIfUndefined || []).forEach((k) => { if (next[k] === undefined) delete next[k]; });
+      this._config = next;
+      this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: next }, bubbles: true, composed: true }));
+    }
+  }
+
+  if (!customElements.get("daylight-heatmap-card-editor")) {
+    customElements.define("daylight-heatmap-card-editor", DaylightHeatmapCardEditor);
   }
   window.customCards = window.customCards || [];
   window.customCards.push({

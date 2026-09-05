@@ -24,6 +24,11 @@ Copia `daylight-heatmap-card.js` in `config/www/`, risorsa `/local/daylight-heat
 
 ## Configurazione
 
+**Editor visuale (v0.3.0, branch `feature/gui-editor`):** Aggiungi card → cerca "Daylight" →
+compili titolo, vista, giorni, riferimento luce, lingua, latitudine/anno opzionali
+e i due interruttori — anteprima live, niente YAML. Lo YAML sotto resta valido
+per chi preferisce il testo.
+
 ```yaml
 type: custom:daylight-heatmap-card
 title: Luce disponibile
