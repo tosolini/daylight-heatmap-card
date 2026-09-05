@@ -384,10 +384,10 @@
         .wcell.future { outline:1px dashed currentColor; outline-offset:-3px; }
         .wd { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; opacity:.85; }
         .dt { font-size:10px; opacity:.7; }
-        .hm { font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:2px; }
-        .sunset { margin-top:4px; }
-        .sunset .tag { display:inline-block; font-size:16px; font-weight:600; font-variant-numeric:tabular-nums;
-          border:1px solid currentColor; border-radius:999px; padding:0 10px; line-height:1.5; opacity:.92; white-space:nowrap; }
+        .hm { font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:3px; }
+        .sunset { margin-top:5px; }
+        .sunset .tag { display:inline-block; font-size:11px; font-weight:500; font-variant-numeric:tabular-nums;
+          border:1px solid currentColor; border-radius:999px; padding:1px 8px; line-height:1.4; opacity:.75; white-space:nowrap; }
         .delta { font-size:10px; opacity:.85; font-variant-numeric:tabular-nums; }
         .delta.up::before { content:"▲ "; font-size:8px; }
         .delta.down::before { content:"▼ "; font-size:8px; }
