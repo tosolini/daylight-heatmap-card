@@ -1,4 +1,4 @@
-/* Daylight Heatmap Card for Home Assistant — v0.4.0
+/* Daylight Heatmap Card for Home Assistant — v0.4.1
  * Luce disponibile giorno per giorno (ore:minuti), calcolo astronomico da
  * latitudine + giorno. Offline, passato e futuro, nessuna API esterna.
  *
@@ -12,7 +12,7 @@
  * la finestra di N giorni avanti/indietro — anche nel futuro (deterministico).
  */
 (function () {
-  const CARD_VERSION = "0.4.0";
+  const CARD_VERSION = "0.4.1";
   console.info(`%cDAYLIGHT-HEATMAP-CARD ${CARD_VERSION}`, "font-weight:bold;");
   const ZENITH = {
     sunrise_sunset: 90.833,
@@ -235,6 +235,12 @@
 
     _chrome({ title, sub, body, foot }) {
       const view = this._view();
+      const cl = this.config.lang === "en" ? "en" : "it";
+      const yearLbl = cl === "en" ? "Year" : "Anno";
+      const weekLbl = cl === "en" ? "Week" : "Settimana";
+      const backLbl = cl === "en" ? "Back" : "Indietro";
+      const todayLbl = cl === "en" ? "Today" : "Torna a oggi";
+      const fwdLbl = cl === "en" ? "Forward" : "Avanti";
       this.shadowRoot.innerHTML = `
       <style>
         ha-card { padding: 12px 12px 8px; }
@@ -258,14 +264,14 @@
             <div class="title">${title}</div>
             <div class="sub">${sub}</div>
             <div class="views">
-              <button id="vYear" class="${view === "year" ? "on" : ""}">Anno</button>
-              <button id="vWeek" class="${view === "week" ? "on" : ""}">Settimana</button>
+              <button id="vYear" class="${view === "year" ? "on" : ""}">${yearLbl}</button>
+              <button id="vWeek" class="${view === "week" ? "on" : ""}">${weekLbl}</button>
             </div>
           </div>
           <div class="nav">
-            <button id="prev" title="Indietro">‹</button>
-            <button id="now" title="Torna a oggi">•</button>
-            <button id="next" title="Avanti">›</button>
+            <button id="prev" title="${backLbl}">‹</button>
+            <button id="now" title="${todayLbl}">•</button>
+            <button id="next" title="${fwdLbl}">›</button>
           </div>
         </div>
         ${body}
@@ -359,10 +365,10 @@
         title: this.config.title || "Luce disponibile",
         sub: `${year} · ${sunsetMode ? sunsetLbl : modeLabel} · lat ${lat.toFixed(2)}°`,
         body: `${style}<div class="wrap"><table><tr><th></th>${months.map((mm) => `<th>${mm}</th>`).join("")}</tr>${rows}</table></div>`,
-        foot: `<span>Min <b>${fmtHM(gmin)}</b></span><span>Max <b>${fmtHM(gmax)}</b></span><span>Media <b>${fmtHM(gmean)}</b></span><span>Escursione <b>${fmtHM(gmax - gmin)}</b></span>`,
+        foot: `<span>Min <b>${fmtHM(gmin)}</b></span><span>Max <b>${fmtHM(gmax)}</b></span><span>${lang === "en" ? "Avg" : "Media"} <b>${fmtHM(gmean)}</b></span><span>${lang === "en" ? "Range" : "Escursione"} <b>${fmtHM(gmax - gmin)}</b></span>`,
       });
-      const prev = this.shadowRoot.getElementById("prev"); if (prev) prev.title = "Anno precedente";
-      const next = this.shadowRoot.getElementById("next"); if (next) next.title = "Anno successivo";
+      const prev = this.shadowRoot.getElementById("prev"); if (prev) prev.title = lang === "en" ? "Previous year" : "Anno precedente";
+      const next = this.shadowRoot.getElementById("next"); if (next) next.title = lang === "en" ? "Next year" : "Anno successivo";
     }
 
     _renderWeek() {
@@ -436,10 +442,10 @@
         title: this.config.title || "Luce disponibile",
         sub: `${rangeLbl} · ${modeLabel} · lat ${lat.toFixed(2)}°`,
         body: `${style}<div class="strip${n >= 9 ? " many" : n >= 6 ? " mid" : ""}">${cells}</div>`,
-        foot: `<span>Periodo min <b>${fmtHM(wmin)}</b></span><span>max <b>${fmtHM(wmax)}</b></span><span>media <b>${fmtHM(wmean)}</b></span>`,
+        foot: `<span>${lang === "en" ? "Period" : "Periodo"} min <b>${fmtHM(wmin)}</b></span><span>max <b>${fmtHM(wmax)}</b></span><span>${lang === "en" ? "avg" : "media"} <b>${fmtHM(wmean)}</b></span>`,
       });
-      const prev = this.shadowRoot.getElementById("prev"); if (prev) prev.title = `Indietro di ${n} giorni`;
-      const next = this.shadowRoot.getElementById("next"); if (next) next.title = `Avanti di ${n} giorni`;
+      const prev = this.shadowRoot.getElementById("prev"); if (prev) prev.title = lang === "en" ? `Back ${n} days` : `Indietro di ${n} giorni`;
+      const next = this.shadowRoot.getElementById("next"); if (next) next.title = lang === "en" ? `Forward ${n} days` : `Avanti di ${n} giorni`;
     }
   }
 

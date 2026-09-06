@@ -26,10 +26,10 @@ don't jump while navigating), text = `H:MM`, delta `±min` vs previous day, toda
 2. Install, then Settings → Dashboards → ⋮ → Resources → add `/hacsfiles/daylight-heatmap-card/daylight-heatmap-card.js` as **JavaScript Module**.
 
 ### Manual
-Copy `daylight-heatmap-card.js` to `config/www/`, resource `/local/daylight-heatmap-card.js?v=0.4.0` as module.
+Copy `daylight-heatmap-card.js` to `config/www/`, resource `/local/daylight-heatmap-card.js?v=0.4.1` as module.
 
 > HA caches frontend resources: after each update bump `?v=…` and hard-refresh (Ctrl+Shift+R).
-> Check DevTools → Console for `DAYLIGHT-HEATMAP-CARD 0.4.0`. Keep a SINGLE resource: if both `/hacsfiles/…` and `/local/…` remain, the first one loaded wins.
+> Check DevTools → Console for `DAYLIGHT-HEATMAP-CARD 0.4.1`. Keep a SINGLE resource: if both `/hacsfiles/…` and `/local/…` remain, the first one loaded wins.
 
 ## Configuration
 
