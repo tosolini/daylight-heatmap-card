@@ -1,64 +1,72 @@
 # Daylight Heatmap Card
 
-Visione tabellare della **luce disponibile giorno per giorno**, espressa in **ore:minuti** — stile
-[temperature-heatmap-card](https://github.com/zanac/temperature-heatmap-card), ma senza sensori:
-la durata è calcolata astronomicamente da **latitudine + giorno dell'anno**. Funziona offline,
-mostra passato e futuro, nessun recorder, nessuna API esterna.
+English | [Italiano](README.it.md)
 
-![layout](docs/screenshot-placeholder.png)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=YOUR_GITHUB_USER&repository=daylight-heatmap-card&category=plugin)
 
-Vista **Anno** (default): tabella 12 mesi × 31 giorni, ‹ › spostano di un anno.
-Vista **Settimana**: striscia di N giorni come temperature-heatmap-card, ‹ › spostano
-di N giorni — avanti e indietro, anche nel futuro (deterministico, bordo tratteggiato).
-Colore = durata (blu inverno → giallo estate, scala fissa sull'anno così i colori
-non saltano navigando), testo = `H:MM`, delta `±min` vs giorno prima, oggi evidenziato.
+Tabular view of **available daylight, day by day**, in **hours:minutes** — styled after
+[temperature-heatmap-card](https://github.com/zanac/temperature-heatmap-card), but with no sensors:
+day length is computed astronomically from **latitude + day of year**. Works offline,
+past and future, no recorder, no external API.
 
-## Installazione
+**Year** view (default): 12 months × 31 days table with daylight totals or sunset times (GUI selector), ‹ › move one year.
+**Week** view: strip of N days starting today, ‹ › move
+N days — back into the past and forward into the future (deterministic, dashed border).
+Color = duration (winter blue → summer yellow, fixed yearly scale so colors
+don't jump while navigating), text = `H:MM`, delta `±min` vs previous day, today highlighted.
+
+## Installation
 
 ### HACS (custom repository)
-1. HACS → Frontend → ⋮ → Custom repositories → URL di questo repo, categoria `Lovelace`.
-2. Installa, poi Impostazioni → Dashboard → ⋮ → Risorse → Aggiungi `/hacsfiles/lightheatmap/daylight-heatmap-card.js` tipo **JavaScript Module**.
+1. HACS → Frontend → ⋮ → Custom repositories → this repo's URL, `Lovelace` category.
+2. Install, then Settings → Dashboards → ⋮ → Resources → add `/hacsfiles/daylight-heatmap-card/daylight-heatmap-card.js` as **JavaScript Module**.
 
-### Manuale
-Copia `daylight-heatmap-card.js` in `config/www/`, risorsa `/local/daylight-heatmap-card.js` tipo modulo.
+### Manual
+Copy `daylight-heatmap-card.js` to `config/www/`, resource `/local/daylight-heatmap-card.js?v=0.4.0` as module.
 
-## Configurazione
+> HA caches frontend resources: after each update bump `?v=…` and hard-refresh (Ctrl+Shift+R).
+> Check DevTools → Console for `DAYLIGHT-HEATMAP-CARD 0.4.0`. Keep a SINGLE resource: if both `/hacsfiles/…` and `/local/…` remain, the first one loaded wins.
 
-**Editor visuale (v0.3.0, branch `feature/gui-editor`):** Aggiungi card → cerca "Daylight" →
-compili titolo, vista, giorni, riferimento luce, lingua, latitudine/anno opzionali
-e i due interruttori — anteprima live, niente YAML. Lo YAML sotto resta valido
-per chi preferisce il testo.
+## Configuration
+
+**Visual editor:** add card → search "Daylight" →
+fill in title, view, days, light reference, language, optional latitude/year
+and the switches (hours, change, sunset, big sunset) — live preview, no YAML. The YAML below still works
+for those who prefer text.
 
 ```yaml
 type: custom:daylight-heatmap-card
-title: Luce disponibile
-view: year               # year | week (switch live Anno/Settimana comunque presente nella card)
-days: 7                 # solo vista week: 3–14 giorni per pagina
+title: Available light
+view: year               # year | week (live Year/Week switch is always present on the card)
+days: 7                 # week view only: 3–14 days per page
 mode: sunrise_sunset   # sunrise_sunset | civil | nautical | astronomical
 show_delta: true
-lang: it               # it | en
+year_value: hours       # year view only: hours | sunset (sunset time instead of the total)
+lang: en               # it | en
 # latitude: 45.46      # default: hass.config.latitude
-# year: 2026           # solo vista year: fissa l'anno base (default: corrente)
+# year: 2026           # year view only: pins the base year (default: current)
 ```
 
-| Opzione | Effetto |
+| Option | Effect |
 |---|---|
-| `mode: sunrise_sunset` | alba→tramonto (zenit 90.833°). Default, è "quanta luce" per la maggior parte degli usi |
-| `mode: civil` | include crepuscolo civile (zenit 96°) — luce utile all'aperto |
-| `mode: nautical / astronomical` | crepuscoli nautico/astronomico, per usi specifici |
-| `latitude` | override; default latitudine di HA (quindi niente da configurare) |
-| `show_delta` | `+1′`/`−1′` vs giorno prima — rende visibile l'allungarsi delle giornate |
+| `mode: sunrise_sunset` | sunrise→sunset (zenith 90.833°). Default, "how much light" for most uses |
+| `mode: civil` | includes civil twilight (zenith 96°) — usable outdoor light |
+| `mode: nautical / astronomical` | nautical/astronomical twilight, for specific uses |
+| `latitude` | override; defaults to HA latitude (so nothing to configure) |
+| `show_delta` | `+1′`/`−1′` vs previous day — makes lengthening days visible |
+| `sunset_big` | big sunset as the primary week-view datum (default `true`) — GUI switch |
+| `year_value` | year-view cell content: `hours` (light total) or `sunset` (sunset time) — GUI selector |
 
-## Perché non serve Home Assistant per i dati
+## Why no Home Assistant data is needed
 
-La durata del dì dipende solo da latitudine e giorno (declinazione solare), non da
-longitudine/fuso: `durata = 2·H/15`, `cosH = (cosZ − sinφ·sinδ)/(cosφ·cosδ)`.
-Il `sun.sun` di HA dà solo gli orari di oggi/domani; il recorder non ha il futuro.
-Calcolo in-card = tabella annuale completa, anche anni futuri, zero dipendenze.
-Accuratezza ~1–2 min (verificato: Milano solstizio estivo 15:41, invernale 8:42).
-Ai poli gestisce giorno/notte polare (24:00 / 0:00).
+Day length depends only on latitude and day (solar declination), not on
+longitude/timezone: `duration = 2·H/15`, `cosH = (cosZ − sinφ·sinδ)/(cosφ·cosδ)`.
+HA's `sun.sun` only gives today's/tomorrow's times; the recorder has no future.
+In-card computation = full yearly table, even future years, zero dependencies.
+Accuracy ~1–2 min (verified: Milan summer solstice 15:41, winter 8:42).
+At the poles it handles polar day/night (24:00 / 0:00).
 
-## Sviluppo
+## Development
 
 ```bash
 docker run --rm -v $(pwd):/workspace -w /workspace node:20-alpine node --check daylight-heatmap-card.js

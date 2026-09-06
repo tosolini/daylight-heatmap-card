@@ -1,4 +1,4 @@
-/* Daylight Heatmap Card for Home Assistant — v0.3.0
+/* Daylight Heatmap Card for Home Assistant — v0.4.0
  * Luce disponibile giorno per giorno (ore:minuti), calcolo astronomico da
  * latitudine + giorno. Offline, passato e futuro, nessuna API esterna.
  *
@@ -12,6 +12,8 @@
  * la finestra di N giorni avanti/indietro — anche nel futuro (deterministico).
  */
 (function () {
+  const CARD_VERSION = "0.4.0";
+  console.info(`%cDAYLIGHT-HEATMAP-CARD ${CARD_VERSION}`, "font-weight:bold;");
   const ZENITH = {
     sunrise_sunset: 90.833,
     civil: 96.0,
@@ -92,6 +94,21 @@
     }
   }
 
+  // Minuti locali da 00:00 del tramonto nel fuso di HA. null = sole che non tramonta/sorge.
+  function sunsetLocalMinutes(latDeg, lngDeg, date, timeZone) {
+    const mins = sunsetUTCMinutes(latDeg, lngDeg, date);
+    if (mins === null) return null;
+    const utc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) + Math.round(mins) * 60000);
+    try {
+      const parts = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone }).formatToParts(utc);
+      let h = 0, mi = 0;
+      for (const p of parts) { if (p.type === "hour") h = Number(p.value); else if (p.type === "minute") mi = Number(p.value); }
+      return h * 60 + mi;
+    } catch (e) {
+      return Math.round(mins);
+    }
+  }
+
   function isLeap(y) {
     return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
   }
@@ -152,9 +169,12 @@
       this._offset = 0; // year: anni | week: finestre da `days` giorni
       this._viewOverride = null; // toggle live Anno/Settimana senza toccare YAML
     }
-
     static getStubConfig() {
-      return { title: "Luce disponibile", mode: "sunrise_sunset", view: "year", days: 7, show_hours: true, show_delta: true, show_sunset: true };
+      return { title: "Luce disponibile", mode: "sunrise_sunset", view: "year", days: 7, show_hours: true, show_delta: true, show_sunset: true, sunset_big: true, year_value: "hours" };
+    }
+
+    static getConfigElement() {
+      return document.createElement("daylight-heatmap-card-editor");
     }
 
     setConfig(config) {
@@ -164,6 +184,7 @@
         config
       );
       if (this.config.view !== "week" && this.config.view !== "year") this.config.view = "year";
+      if (this.config.year_value !== "sunset") this.config.year_value = "hours";
       this.config.days = Math.min(14, Math.max(3, Number(this.config.days) || 7));
       this._offset = 0;
       this._viewOverride = null;
@@ -266,6 +287,10 @@
       const months = MONTH_SHORT[lang];
       const showHours = this.config.show_hours !== false;
       const showDelta = this.config.show_delta !== false;
+      const sunsetMode = this.config.year_value === "sunset";
+      const lng = sunsetMode ? this._longitude() : 0;
+      const tz = sunsetMode ? this._timeZone() : undefined;
+      const sunsetLbl = lang === "en" ? "Sunset" : "Tramonto";
       const leap = isLeap(year);
       const dim = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -275,14 +300,17 @@
       for (let m = 0; m < 12; m++) {
         grid[m] = [];
         for (let d = 1; d <= dim[m]; d++) {
-          const mins = daylightMinutes(lat, dayOfYear(year, m, d), zenith);
+          const mins = sunsetMode
+            ? sunsetLocalMinutes(lat, lng, new Date(year, m, d), tz)
+            : daylightMinutes(lat, dayOfYear(year, m, d), zenith);
           grid[m][d] = mins;
-          if (mins < gmin) gmin = mins;
-          if (mins > gmax) gmax = mins;
+          if (mins !== null) { if (mins < gmin) gmin = mins; if (mins > gmax) gmax = mins; }
         }
       }
-      const gsum = grid.flatMap((mm, m) => Array.from({ length: dim[m] }, (_, i) => mm[i + 1])).reduce((a, b) => a + b, 0);
-      const gmean = Math.round(gsum / dim.reduce((a, b) => a + b, 0));
+      const gvals = grid.flatMap((mm, m) => Array.from({ length: dim[m] }, (_, i) => mm[i + 1]).filter((v) => v !== null));
+      const gsum = gvals.reduce((a, b) => a + b, 0);
+      const gmean = gvals.length ? Math.round(gsum / gvals.length) : 0;
+      if (gmax < gmin) { gmin = 0; gmax = 1; }
 
       const now = new Date();
       const isThisYear = now.getFullYear() === year;
@@ -295,38 +323,41 @@
           if (d > dim[m]) { tds += `<td class="empty"></td>`; continue; }
           const mins = grid[m][d];
           const isToday = isThisYear && m === now.getMonth() && d === now.getDate();
+          const disp = mins === null ? "—" : fmtHM(mins);
           let deltaTxt = "";
-          if (showDelta) {
+          if (showDelta && mins !== null) {
             let pm = m, pd = d - 1;
             if (pd < 1) { pm = m - 1; if (pm >= 0) pd = dim[pm]; }
-            if (pm >= 0 && pd >= 1 && grid[pm][pd] !== undefined) {
+            if (pm >= 0 && pd >= 1 && grid[pm][pd] !== undefined && grid[pm][pd] !== null) {
               const dd = mins - grid[pm][pd];
               if (dd !== 0) deltaTxt = `<span class="delta ${dd > 0 ? "up" : "down"}">${dd > 0 ? "+" : "−"}${Math.abs(dd)}′</span>`;
             }
           }
-          tds += `<td class="cell${isToday ? " today" : ""}" style="background:${colorFor(mins, gmin, gmax)};color:${textColor(mins, gmin, gmax)}" title="${d} ${months[m]} ${year}: ${fmtHM(mins)} (${modeLabel})"><div class="hm">${showHours ? fmtHM(mins) : ""}</div>${deltaTxt}</td>`;
+          tds += `<td class="cell${isToday ? " today" : ""}" style="background:${colorFor(mins === null ? gmin : mins, gmin, gmax)};color:${textColor(mins === null ? gmin : mins, gmin, gmax)}" title="${d} ${months[m]} ${year}: ${disp} (${sunsetMode ? sunsetLbl.toLowerCase() : modeLabel})"><div class="hm">${showHours ? disp : ""}</div>${deltaTxt}</td>`;
         }
         rows += `<tr>${tds}</tr>`;
       }
 
       const style = `<style>
         .wrap { overflow-x:auto; }
-        table { border-collapse:separate; border-spacing:2px; width:100%; font-size:10px; }
-        th { font-size:10px; font-weight:600; opacity:.75; padding:2px 1px; min-width:44px; }
-        td.daynum { text-align:right; opacity:.55; padding-right:4px; min-width:18px; font-size:10px; }
-        td.cell { text-align:center; border-radius:5px; padding:3px 1px; min-width:44px; line-height:1.25; }
+        table { border-collapse:separate; border-spacing:2px; width:100%; max-width:100%; table-layout:fixed; font-size:10px; }
+        th, td { box-sizing:border-box; min-width:0; }
+        th { font-size:10px; font-weight:600; opacity:.75; padding:2px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        th:first-child, td.daynum { width:16px; min-width:16px; max-width:16px; text-align:right; opacity:.55; padding-right:2px; font-size:10px; }
+        td.cell { text-align:center; border-radius:5px; padding:2px 0; overflow:hidden; line-height:1.25; }
         td.cell.today { outline:2px solid var(--primary-color,#03a9f4); outline-offset:-2px; font-weight:700; }
         td.empty { background:transparent; }
-        .hm { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .hm { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; letter-spacing:-0.01em; }
         .delta { font-size:8px; opacity:.8; font-variant-numeric:tabular-nums; white-space:nowrap; }
         .delta.up::before { content:"▲ "; font-size:7px; }
         .delta.down::before { content:"▼ "; font-size:7px; }
-        @media (max-width:640px){ th, td.cell { min-width:34px; } table { font-size:9px; } }
+        @media (max-width:640px){ table { border-spacing:1px; font-size:8px; } th { font-size:8px; padding:1px 0; } th:first-child, td.daynum { width:14px; min-width:14px; max-width:14px; font-size:8px; } td.cell { padding:1px 0; border-radius:3px; } .hm { font-size:8px; } .delta { font-size:7px; } }
+        @media (max-width:400px){ th { font-size:7px; } .hm { font-size:7px; } }
       </style>`;
 
       this._chrome({
         title: this.config.title || "Luce disponibile",
-        sub: `${year} · ${modeLabel} · lat ${lat.toFixed(2)}°`,
+        sub: `${year} · ${sunsetMode ? sunsetLbl : modeLabel} · lat ${lat.toFixed(2)}°`,
         body: `${style}<div class="wrap"><table><tr><th></th>${months.map((mm) => `<th>${mm}</th>`).join("")}</tr>${rows}</table></div>`,
         foot: `<span>Min <b>${fmtHM(gmin)}</b></span><span>Max <b>${fmtHM(gmax)}</b></span><span>Media <b>${fmtHM(gmean)}</b></span><span>Escursione <b>${fmtHM(gmax - gmin)}</b></span>`,
       });
@@ -342,15 +373,16 @@
       const wdays = WEEKDAY_SHORT[lang];
       const n = this.config.days;
       const showSunset = this.config.show_sunset !== false;
+      const sunBig = showSunset && this.config.sunset_big !== false;
       const showDelta = this.config.show_delta !== false;
       const lng = this._longitude();
       const tz = this._timeZone();
       const modeLabel = (MODE_LABEL[this.config.mode] || MODE_LABEL.sunrise_sunset)[lang];
       const today = new Date();
 
-      // Finestra di N giorni che termina oggi, spostata di offset*N (anche nel futuro).
-      const end = addDays(today, this._offset * n);
-      const days = Array.from({ length: n }, (_, i) => addDays(end, i - (n - 1)));
+      // Finestra di N giorni che parte da oggi, spostata di offset*N (‹ va nel passato).
+      const start = addDays(today, this._offset * n);
+      const days = Array.from({ length: n }, (_, i) => addDays(start, i));
 
       const vals = days.map((dt) => daylightMinutes(lat, dayOfYearFromDate(dt), zenith));
       const [smin, smax] = yearMinMax(lat, days[n - 1].getFullYear(), zenith);
@@ -370,10 +402,10 @@
         const deltaTxt = showDelta && dd !== 0 ? `<div class="delta ${dd > 0 ? "up" : "down"}">${dd > 0 ? "+" : "−"}${Math.abs(dd)}′</div>` : `<div class="delta">·</div>`;
         const sunset = showSunset ? fmtSunset(lat, lng, dt, tz, lang) : null;
         const sunsetLbl = lang === "en" ? "Sunset" : "Tramonto";
-        return `<div class="wcell${isToday ? " today" : ""}${isFuture ? " future" : ""}" style="background:${colorFor(mins, smin, smax)};color:${textColor(mins, smin, smax)}" title="${wdays[dt.getDay()]} ${dt.getDate()} ${months[dt.getMonth()]}: ${fmtHM(mins)} (${modeLabel})${sunset ? `, ${sunsetLbl.toLowerCase()} ${sunset}` : ""}">
+        return `<div class="wcell${isToday ? " today" : ""}${isFuture ? " future" : ""}${sunBig ? " sunbig" : ""}" style="background:${colorFor(mins, smin, smax)};color:${textColor(mins, smin, smax)}" title="${wdays[dt.getDay()]} ${dt.getDate()} ${months[dt.getMonth()]}: ${fmtHM(mins)} (${modeLabel})${sunset ? `, ${sunsetLbl.toLowerCase()} ${sunset}` : ""}">
           <div class="wd">${wdays[dt.getDay()]}${isToday ? " •" : ""}</div>
           <div class="dt">${dt.getDate()}/${dt.getMonth() + 1}</div>
-          ${sunset ? `<div class="sunset" title="${sunsetLbl}">↓ ${sunset}</div>` : ""}
+          ${sunset ? `<div class="sunset" title="${sunsetLbl}"><span class="slbl">${sunsetLbl}</span><span class="stime">${sunset}</span></div>` : ""}
           <div class="hm">${fmtHM(mins)}</div>${deltaTxt}</div>`;
       }).join("");
 
@@ -385,9 +417,17 @@
         .wd { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; opacity:.85; }
         .dt { font-size:10px; opacity:.7; }
         .hm { font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:3px; }
-        .sunset { margin-top:5px; font-size:12px; font-weight:500; opacity:.8; font-variant-numeric:tabular-nums; white-space:nowrap; }
-        .delta { font-size:10px; opacity:.85; font-variant-numeric:tabular-nums; }
-        @media (max-width:640px){ .hm { font-size:15px; } .sunset { font-size:11px; } }
+        .sunset { margin-top:5px; }
+        .slbl { display:block; font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; opacity:.7; }
+        .stime { display:block; font-variant-numeric:tabular-nums; white-space:nowrap; font-size:13px; font-weight:600; }
+        .wcell.sunbig .sunset { margin-top:4px; }
+        .wcell.sunbig .stime { font-size:20px; font-weight:700; }
+        .wcell.sunbig .hm { margin-top:2px; font-size:13px; font-weight:500; opacity:.85; }
+        .strip.mid .wcell.sunbig .stime { font-size:17px; }
+        .strip.many .wcell.sunbig .stime { font-size:13px; }
+        .strip.many .wcell.sunbig .hm { font-size:12px; }
+        @media (max-width:640px){ .hm { font-size:15px; } .stime { font-size:12px; } .wcell.sunbig .stime { font-size:17px; } .strip.mid .wcell.sunbig .stime { font-size:14px; } .strip.many .wcell.sunbig .stime { font-size:12px; } .wcell.sunbig .hm { font-size:12px; } }
+.delta { font-size:10px; opacity:.85; font-variant-numeric:tabular-nums; }
         .delta.up::before { content:"▲ "; font-size:8px; }
         .delta.down::before { content:"▼ "; font-size:8px; }
       </style>`;
@@ -395,7 +435,7 @@
       this._chrome({
         title: this.config.title || "Luce disponibile",
         sub: `${rangeLbl} · ${modeLabel} · lat ${lat.toFixed(2)}°`,
-        body: `${style}<div class="strip">${cells}</div>`,
+        body: `${style}<div class="strip${n >= 9 ? " many" : n >= 6 ? " mid" : ""}">${cells}</div>`,
         foot: `<span>Periodo min <b>${fmtHM(wmin)}</b></span><span>max <b>${fmtHM(wmax)}</b></span><span>media <b>${fmtHM(wmean)}</b></span>`,
       });
       const prev = this.shadowRoot.getElementById("prev"); if (prev) prev.title = `Indietro di ${n} giorni`;
@@ -442,9 +482,13 @@
         latitude: { it: "Latitudine (vuoto = quella di HA)", en: "Latitude (empty = HA one)" },
         longitude: { it: "Longitudine (vuoto = quella di HA)", en: "Longitude (empty = HA one)" },
         yearFix: { it: "Anno fisso (vuoto = corrente)", en: "Fixed year (empty = current)" },
+        yearValue: { it: "Contenuto vista annuale", en: "Year view content" },
+        hours: { it: "Ore di luce (totale giorno)", en: "Daylight hours (day total)" },
+        sunsetTime: { it: "Ora del tramonto", en: "Sunset time" },
         show_hours: { it: "Mostra ore:minuti", en: "Show hours:minutes" },
         show_delta: { it: "Mostra variazione giornaliera", en: "Show daily change" },
         show_sunset: { it: "Mostra ora del tramonto (vista settimana)", en: "Show sunset time (week view)" },
+        sunset_big: { it: "Tramonto in grande come dato principale", en: "Large sunset as primary value" },
       };
       return (STR[key] || {})[lang] || key;
     }
@@ -489,10 +533,17 @@
           <label class="f"><span>${this._t("latitude")}</span><input id="fLat" type="number" step="0.01" min="-90" max="90"></label>
           <label class="f"><span>${this._t("longitude")}</span><input id="fLng" type="number" step="0.01" min="-180" max="180"></label>
         </div>
-        <label class="f"><span>${this._t("yearFix")}</span><input id="fYear" type="number" step="1"></label>
+        <div class="row2">
+          <label class="f"><span>${this._t("yearFix")}</span><input id="fYear" type="number" step="1"></label>
+          <label class="f"><span>${this._t("yearValue")}</span><select id="fYearVal">
+            <option value="hours">${this._t("hours")}</option>
+            <option value="sunset">${this._t("sunsetTime")}</option>
+          </select></label>
+        </div>
         <div class="switch"><span>${this._t("show_hours")}</span><input id="fHours" type="checkbox"></div>
         <div class="switch"><span>${this._t("show_delta")}</span><input id="fDelta" type="checkbox"></div>
         <div class="switch"><span>${this._t("show_sunset")}</span><input id="fSun" type="checkbox"></div>
+        <div class="switch"><span>${this._t("sunset_big")}</span><input id="fSunBig" type="checkbox"></div>
       </div>`;
       const $ = (id) => this.shadowRoot.getElementById(id);
       // Valori iniziali via _sync (stessa logica del re-sync, non ruba il focus).
@@ -527,6 +578,8 @@
       $("fHours").addEventListener("change", (e) => this._fire({ show_hours: e.target.checked }));
       $("fDelta").addEventListener("change", (e) => this._fire({ show_delta: e.target.checked }));
       $("fSun").addEventListener("change", (e) => this._fire({ show_sunset: e.target.checked }));
+      $("fSunBig").addEventListener("change", (e) => this._fire({ sunset_big: e.target.checked }));
+      $("fYearVal").addEventListener("change", (e) => this._fire({ year_value: e.target.value }));
     }
 
     _sync() {
@@ -541,10 +594,12 @@
       set("fMode", "value", c.mode || "sunrise_sunset");
       set("fLat", "value", c.latitude ?? "");
       set("fYear", "value", Number.isInteger(c.year) ? c.year : "");
+      set("fYearVal", "value", c.year_value === "sunset" ? "sunset" : "hours");
       set("fLng", "value", c.longitude ?? "");
       set("fHours", "checked", c.show_hours !== false);
       set("fDelta", "checked", c.show_delta !== false);
       set("fSun", "checked", c.show_sunset !== false);
+      set("fSunBig", "checked", c.sunset_big !== false);
     }
 
     _fire(patch, dropIfUndefined) {
