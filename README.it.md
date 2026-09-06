@@ -13,6 +13,10 @@ di N giorni — indietro nel passato e avanti nel futuro (deterministico, bordo 
 Colore = durata (blu inverno → giallo estate, scala fissa sull'anno così i colori
 non saltano navigando), testo = `H:MM`, delta `±min` vs giorno prima, oggi evidenziato.
 
+![Vista annuale](docs/screenshot-year.png)
+![Vista settimanale](docs/screenshot-week.png)
+![Editor visuale](docs/screenshot-editor.png)
+
 ## Installazione
 
 ### HACS (custom repository)

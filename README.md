@@ -15,6 +15,10 @@ N days — back into the past and forward into the future (deterministic, dashed
 Color = duration (winter blue → summer yellow, fixed yearly scale so colors
 don't jump while navigating), text = `H:MM`, delta `±min` vs previous day, today highlighted.
 
+![Year view](docs/screenshot-year.png)
+![Week view](docs/screenshot-week.png)
+![Visual editor](docs/screenshot-editor.png)
+
 ## Installation
 
 ### HACS (custom repository)
