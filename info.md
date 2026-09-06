@@ -7,4 +7,4 @@ astronomically from latitude + day of year, so it works offline, in the past and
 - **Week:** strip of N days from today onward, with sunset times and daily deltas
 - Visual GUI editor included, English + Italian
 
-See [README](https://github.com/YOUR_GITHUB_USER/daylight-heatmap-card/blob/main/README.md) for installation and configuration.
+See [README](https://github.com/tosolini/daylight-heatmap-card/blob/main/README.md) for installation and configuration.

@@ -2,7 +2,7 @@
 
 English | [Italiano](README.it.md)
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=YOUR_GITHUB_USER&repository=daylight-heatmap-card&category=plugin)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tosolini&repository=daylight-heatmap-card&category=plugin)
 
 Tabular view of **available daylight, day by day**, in **hours:minutes** — styled after
 [temperature-heatmap-card](https://github.com/zanac/temperature-heatmap-card), but with no sensors:
@@ -71,3 +71,8 @@ At the poles it handles polar day/night (24:00 / 0:00).
 ```bash
 docker run --rm -v $(pwd):/workspace -w /workspace node:20-alpine node --check daylight-heatmap-card.js
 ```
+
+## Credits
+
+Card by [Walter Tosolini](https://www.tosolini.info).
+Made with AI and [OMP.sh](https://omp.sh).

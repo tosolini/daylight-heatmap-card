@@ -69,3 +69,8 @@ Ai poli gestisce giorno/notte polare (24:00 / 0:00).
 ```bash
 docker run --rm -v $(pwd):/workspace -w /workspace node:20-alpine node --check daylight-heatmap-card.js
 ```
+
+## Crediti
+
+Card di [Walter Tosolini](https://www.tosolini.info).
+Realizzata con AI e [OMP.sh](https://omp.sh).
