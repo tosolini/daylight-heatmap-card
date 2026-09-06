@@ -8,3 +8,5 @@ astronomically from latitude + day of year, so it works offline, in the past and
 - Visual GUI editor included, English + Italian
 
 See [README](https://github.com/tosolini/daylight-heatmap-card/blob/main/README.md) for installation and configuration.
+
+![Week view](docs/screenshot-week.png)
