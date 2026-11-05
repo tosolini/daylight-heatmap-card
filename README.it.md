@@ -2,6 +2,9 @@
 
 [English](README.md) | Italiano
 
+[![Apri nel Marketplace di Home Assistant](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=tosolini&repository=daylight-heatmap-card&category=plugin)
+[![Apri in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tosolini&repository=daylight-heatmap-card&category=plugin)
+
 Visione tabellare della **luce disponibile giorno per giorno**, espressa in **ore:minuti** — stile
 [temperature-heatmap-card](https://github.com/zanac/temperature-heatmap-card), ma senza sensori:
 la durata è calcolata astronomicamente da **latitudine + giorno dell'anno**. Funziona offline,
@@ -19,15 +22,18 @@ non saltano navigando), testo = `H:MM`, delta `±min` vs giorno prima, oggi evid
 
 ## Installazione
 
-### HACS (custom repository)
-1. HACS → Frontend → ⋮ → Custom repositories → URL di questo repo, categoria `Lovelace`.
+### Marketplace (Home Assistant ≥ 2026.11)
+Clicca sul pulsante **Apri nel Marketplace** qui sopra, oppure vai in **Impostazioni** → **Marketplace** → cerca `Daylight Heatmap Card` e clicca **Installa**.
+
+### HACS (Home Assistant < 2026.11)
+1. Clicca sul pulsante **Apri in HACS** qui sopra, oppure HACS → Frontend → ⋮ → Custom repositories → URL di questo repo, categoria `Lovelace`.
 2. Installa, poi Impostazioni → Dashboard → ⋮ → Risorse → Aggiungi `/hacsfiles/daylight-heatmap-card/daylight-heatmap-card.js` tipo **JavaScript Module**.
 
 ### Manuale
-Copia `daylight-heatmap-card.js` in `config/www/`, risorsa `/local/daylight-heatmap-card.js?v=0.4.1` tipo modulo.
+Copia `daylight-heatmap-card.js` in `config/www/`, risorsa `/local/daylight-heatmap-card.js?v=0.4.2` tipo modulo.
 
 > Cache di HA: a ogni aggiornamento cambia `?v=…` e ricarica con Ctrl+Maiusc+R.
-> Verifica in Strumenti sviluppo → Console: `DAYLIGHT-HEATMAP-CARD 0.4.1`. Tieni UNA sola risorsa: se restano sia `/hacsfiles/…` che `/local/…`, vince la prima caricata e il fix non si vede.
+> Verifica in Strumenti sviluppo → Console: `DAYLIGHT-HEATMAP-CARD 0.4.2`. Tieni UNA sola risorsa: se restano sia `/hacsfiles/…` che `/local/…`, vince la prima caricata e il fix non si vede.
 
 ## Configurazione
 

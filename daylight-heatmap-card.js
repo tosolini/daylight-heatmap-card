@@ -1,4 +1,4 @@
-/* Daylight Heatmap Card for Home Assistant — v0.4.1
+/* Daylight Heatmap Card for Home Assistant — v0.4.2
  * Luce disponibile giorno per giorno (ore:minuti), calcolo astronomico da
  * latitudine + giorno. Offline, passato e futuro, nessuna API esterna.
  *
@@ -12,7 +12,7 @@
  * la finestra di N giorni avanti/indietro — anche nel futuro (deterministico).
  */
 (function () {
-  const CARD_VERSION = "0.4.1";
+  const CARD_VERSION = "0.4.2";
   console.info(`%cDAYLIGHT-HEATMAP-CARD ${CARD_VERSION}`, "font-weight:bold;");
   const ZENITH = {
     sunrise_sunset: 90.833,
@@ -243,7 +243,7 @@
       const fwdLbl = cl === "en" ? "Forward" : "Avanti";
       this.shadowRoot.innerHTML = `
       <style>
-        ha-card { padding: 12px 12px 8px; }
+        ha-card { padding: 12px 12px 8px; box-sizing: border-box; }
         .head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:6px; }
         .title { font-size:15px; font-weight:600; }
         .sub { font-size:11px; opacity:.65; margin-top:2px; }
@@ -345,7 +345,7 @@
       }
 
       const style = `<style>
-        .wrap { overflow-x:auto; }
+        .wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
         table { border-collapse:separate; border-spacing:2px; width:100%; max-width:100%; table-layout:fixed; font-size:10px; }
         th, td { box-sizing:border-box; min-width:0; }
         th { font-size:10px; font-weight:600; opacity:.75; padding:2px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -416,32 +416,52 @@
       }).join("");
 
       const style = `<style>
-        .strip { display:grid; grid-template-columns:repeat(${n},minmax(0,1fr)); gap:4px; }
-        .wcell { min-width:0; overflow:hidden; text-align:center; border-radius:8px; padding:8px 1px 6px; line-height:1.3; }
-        .wcell.today { outline:2px solid var(--primary-color,#03a9f4); outline-offset:-2px; }
-        .wcell.future { outline:1px dashed currentColor; outline-offset:-3px; }
-        .wd { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; opacity:.85; }
-        .dt { font-size:10px; opacity:.7; }
-        .hm { font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:3px; }
-        .sunset { margin-top:5px; }
-        .slbl { display:block; font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; opacity:.7; }
-        .stime { display:block; font-variant-numeric:tabular-nums; white-space:nowrap; font-size:13px; font-weight:600; }
-        .wcell.sunbig .sunset { margin-top:4px; }
-        .wcell.sunbig .stime { font-size:20px; font-weight:700; }
-        .wcell.sunbig .hm { margin-top:2px; font-size:13px; font-weight:500; opacity:.85; }
-        .strip.mid .wcell.sunbig .stime { font-size:17px; }
-        .strip.many .wcell.sunbig .stime { font-size:13px; }
-        .strip.many .wcell.sunbig .hm { font-size:12px; }
-        @media (max-width:640px){ .hm { font-size:15px; } .stime { font-size:12px; } .wcell.sunbig .stime { font-size:17px; } .strip.mid .wcell.sunbig .stime { font-size:14px; } .strip.many .wcell.sunbig .stime { font-size:12px; } .wcell.sunbig .hm { font-size:12px; } }
-.delta { font-size:10px; opacity:.85; font-variant-numeric:tabular-nums; }
-        .delta.up::before { content:"▲ "; font-size:8px; }
-        .delta.down::before { content:"▼ "; font-size:8px; }
+        .strip-wrap {
+          overflow-x: auto;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
+          scroll-behavior: smooth;
+          scroll-snap-type: x proximity;
+          padding: 3px 2px 8px;
+          margin: -3px -2px -8px;
+          scrollbar-width: thin;
+          scrollbar-color: var(--divider-color, rgba(128,128,128,0.3)) transparent;
+        }
+        .strip-wrap::-webkit-scrollbar { height: 4px; }
+        .strip-wrap::-webkit-scrollbar-track { background: transparent; }
+        .strip-wrap::-webkit-scrollbar-thumb { background: var(--divider-color, rgba(128,128,128,0.3)); border-radius: 4px; }
+        .strip { display: flex; gap: 6px; width: max-content; min-width: 100%; box-sizing: border-box; }
+        .wcell {
+          flex: 1 0 84px;
+          min-width: 84px;
+          box-sizing: border-box;
+          overflow: hidden;
+          text-align: center;
+          border-radius: 8px;
+          padding: 8px 4px 6px;
+          line-height: 1.3;
+          scroll-snap-align: start;
+        }
+        .wcell.today { outline: 2px solid var(--primary-color,#03a9f4); outline-offset: -2px; }
+        .wcell.future { outline: 1px dashed currentColor; outline-offset: -3px; }
+        .wd { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; opacity: .85; }
+        .dt { font-size: 10px; opacity: .7; }
+        .hm { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px; }
+        .sunset { margin-top: 5px; }
+        .slbl { display: block; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; opacity: .7; }
+        .stime { display: block; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 13px; font-weight: 600; }
+        .wcell.sunbig .sunset { margin-top: 4px; }
+        .wcell.sunbig .stime { font-size: 19px; font-weight: 700; }
+        .wcell.sunbig .hm { margin-top: 2px; font-size: 13px; font-weight: 500; opacity: .85; }
+        .delta { font-size: 10px; opacity: .85; font-variant-numeric: tabular-nums; }
+        .delta.up::before { content: "▲ "; font-size: 8px; }
+        .delta.down::before { content: "▼ "; font-size: 8px; }
       </style>`;
 
       this._chrome({
         title: this.config.title || "Luce disponibile",
         sub: `${rangeLbl} · ${modeLabel} · lat ${lat.toFixed(2)}°`,
-        body: `${style}<div class="strip${n >= 9 ? " many" : n >= 6 ? " mid" : ""}">${cells}</div>`,
+        body: `${style}<div class="strip-wrap"><div class="strip">${cells}</div></div>`,
         foot: `<span>${lang === "en" ? "Period" : "Periodo"} min <b>${fmtHM(wmin)}</b></span><span>max <b>${fmtHM(wmax)}</b></span><span>${lang === "en" ? "avg" : "media"} <b>${fmtHM(wmean)}</b></span>`,
       });
       const prev = this.shadowRoot.getElementById("prev"); if (prev) prev.title = lang === "en" ? `Back ${n} days` : `Indietro di ${n} giorni`;
