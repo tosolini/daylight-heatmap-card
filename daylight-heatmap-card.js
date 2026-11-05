@@ -1,4 +1,4 @@
-/* Daylight Heatmap Card for Home Assistant — v0.4.3
+/* Daylight Heatmap Card for Home Assistant — v0.4.4
  * Luce disponibile giorno per giorno (ore:minuti), calcolo astronomico da
  * latitudine + giorno. Offline, passato e futuro, nessuna API esterna.
  *
@@ -12,7 +12,7 @@
  * la finestra di N giorni avanti/indietro — anche nel futuro (deterministico).
  */
 (function () {
-  const CARD_VERSION = "0.4.3";
+  const CARD_VERSION = "0.4.4";
   console.info(`%cDAYLIGHT-HEATMAP-CARD ${CARD_VERSION}`, "font-weight:bold;");
   const ZENITH = {
     sunrise_sunset: 90.833,
@@ -192,8 +192,17 @@
     }
 
     set hass(hass) {
+      const oldCfg = this._hass && this._hass.config;
+      const newCfg = hass && hass.config;
+      const todayStr = new Date().toDateString();
+      const dayChanged = this._lastRenderDay && this._lastRenderDay !== todayStr;
       this._hass = hass;
-      this._render();
+      if (!this._rendered || dayChanged || !oldCfg ||
+          oldCfg.latitude !== (newCfg && newCfg.latitude) ||
+          oldCfg.longitude !== (newCfg && newCfg.longitude) ||
+          oldCfg.time_zone !== (newCfg && newCfg.time_zone)) {
+        this._render();
+      }
     }
 
     _view() {
@@ -229,6 +238,8 @@
     }
     _render() {
       if (!this.shadowRoot || !this.config) return;
+      this._rendered = true;
+      this._lastRenderDay = new Date().toDateString();
       if (this._view() === "week") this._renderWeek();
       else this._renderYear();
     }
@@ -299,6 +310,7 @@
       };
       this.shadowRoot.getElementById("now").onclick = (e) => {
         e.stopPropagation();
+        this._scrollPos = 0;
         const todayEl = this.shadowRoot.querySelector(".wcell.today");
         if (this._view() === "week" && todayEl) {
           todayEl.scrollIntoView({ inline: "start", behavior: "smooth" });
@@ -307,8 +319,8 @@
           this._render();
         }
       };
-      this.shadowRoot.getElementById("vYear").onclick = (e) => { e.stopPropagation(); this._viewOverride = "year"; this._offset = 0; this._render(); };
-      this.shadowRoot.getElementById("vWeek").onclick = (e) => { e.stopPropagation(); this._viewOverride = "week"; this._offset = 0; this._render(); };
+      this.shadowRoot.getElementById("vYear").onclick = (e) => { e.stopPropagation(); this._scrollPos = 0; this._viewOverride = "year"; this._offset = 0; this._render(); };
+      this.shadowRoot.getElementById("vWeek").onclick = (e) => { e.stopPropagation(); this._scrollPos = 0; this._viewOverride = "week"; this._offset = 0; this._render(); };
     }
 
     _renderYear() {
@@ -500,8 +512,11 @@
       let appending = false;
 
       if (wrap && strip) {
+        if (this._scrollPos && this._scrollPos > 0) {
+          wrap.scrollLeft = this._scrollPos;
+        }
         wrap.addEventListener("scroll", () => {
-          if (appending) return;
+          this._scrollPos = wrap.scrollLeft;
           if (wrap.scrollLeft + wrap.clientWidth >= wrap.scrollWidth - 120) {
             appending = true;
             let addedHtml = "";
