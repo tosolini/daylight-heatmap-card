@@ -1,4 +1,4 @@
-/* Daylight Heatmap Card for Home Assistant — v0.4.2
+/* Daylight Heatmap Card for Home Assistant — v0.4.3
  * Luce disponibile giorno per giorno (ore:minuti), calcolo astronomico da
  * latitudine + giorno. Offline, passato e futuro, nessuna API esterna.
  *
@@ -12,7 +12,7 @@
  * la finestra di N giorni avanti/indietro — anche nel futuro (deterministico).
  */
 (function () {
-  const CARD_VERSION = "0.4.2";
+  const CARD_VERSION = "0.4.3";
   console.info(`%cDAYLIGHT-HEATMAP-CARD ${CARD_VERSION}`, "font-weight:bold;");
   const ZENITH = {
     sunrise_sunset: 90.833,
@@ -277,9 +277,36 @@
         ${body}
         <div class="foot">${foot}</div>
       </ha-card>`;
-      this.shadowRoot.getElementById("prev").onclick = (e) => { e.stopPropagation(); this._offset--; this._render(); };
-      this.shadowRoot.getElementById("next").onclick = (e) => { e.stopPropagation(); this._offset++; this._render(); };
-      this.shadowRoot.getElementById("now").onclick = (e) => { e.stopPropagation(); this._offset = 0; this._render(); };
+      this.shadowRoot.getElementById("prev").onclick = (e) => {
+        e.stopPropagation();
+        const wrap = this.shadowRoot.querySelector(".strip-wrap");
+        if (this._view() === "week" && wrap && wrap.scrollLeft > 60) {
+          wrap.scrollBy({ left: -wrap.clientWidth * 0.8, behavior: "smooth" });
+        } else {
+          this._offset--;
+          this._render();
+        }
+      };
+      this.shadowRoot.getElementById("next").onclick = (e) => {
+        e.stopPropagation();
+        const wrap = this.shadowRoot.querySelector(".strip-wrap");
+        if (this._view() === "week" && wrap && wrap.scrollWidth > wrap.clientWidth + 10) {
+          wrap.scrollBy({ left: wrap.clientWidth * 0.8, behavior: "smooth" });
+        } else {
+          this._offset++;
+          this._render();
+        }
+      };
+      this.shadowRoot.getElementById("now").onclick = (e) => {
+        e.stopPropagation();
+        const todayEl = this.shadowRoot.querySelector(".wcell.today");
+        if (this._view() === "week" && todayEl) {
+          todayEl.scrollIntoView({ inline: "start", behavior: "smooth" });
+        } else {
+          this._offset = 0;
+          this._render();
+        }
+      };
       this.shadowRoot.getElementById("vYear").onclick = (e) => { e.stopPropagation(); this._viewOverride = "year"; this._offset = 0; this._render(); };
       this.shadowRoot.getElementById("vWeek").onclick = (e) => { e.stopPropagation(); this._viewOverride = "week"; this._offset = 0; this._render(); };
     }
@@ -398,30 +425,30 @@
 
       const rangeLbl = `${days[0].getDate()} ${months[days[0].getMonth()]} → ${days[n - 1].getDate()} ${months[days[n - 1].getMonth()]} ${days[n - 1].getFullYear()}`;
 
-      const cells = days.map((dt, i) => {
-        const mins = vals[i];
+      const renderCell = (dt) => {
+        const mins = daylightMinutes(lat, dayOfYearFromDate(dt), zenith);
+        const prevMins = daylightMinutes(lat, dayOfYearFromDate(addDays(dt, -1)), zenith);
         const isToday = sameDay(dt, today);
         const isFuture = dt > today && !isToday;
-        let dd = 0;
-        if (i > 0) dd = vals[i] - vals[i - 1];
-        else dd = mins - daylightMinutes(lat, dayOfYearFromDate(addDays(dt, -1)), zenith);
+        const dd = mins - prevMins;
         const deltaTxt = showDelta && dd !== 0 ? `<div class="delta ${dd > 0 ? "up" : "down"}">${dd > 0 ? "+" : "−"}${Math.abs(dd)}′</div>` : `<div class="delta">·</div>`;
         const sunset = showSunset ? fmtSunset(lat, lng, dt, tz, lang) : null;
         const sunsetLbl = lang === "en" ? "Sunset" : "Tramonto";
+        const [smin, smax] = yearMinMax(lat, dt.getFullYear(), zenith);
         return `<div class="wcell${isToday ? " today" : ""}${isFuture ? " future" : ""}${sunBig ? " sunbig" : ""}" style="background:${colorFor(mins, smin, smax)};color:${textColor(mins, smin, smax)}" title="${wdays[dt.getDay()]} ${dt.getDate()} ${months[dt.getMonth()]}: ${fmtHM(mins)} (${modeLabel})${sunset ? `, ${sunsetLbl.toLowerCase()} ${sunset}` : ""}">
           <div class="wd">${wdays[dt.getDay()]}${isToday ? " •" : ""}</div>
           <div class="dt">${dt.getDate()}/${dt.getMonth() + 1}</div>
           ${sunset ? `<div class="sunset" title="${sunsetLbl}"><span class="slbl">${sunsetLbl}</span><span class="stime">${sunset}</span></div>` : ""}
           <div class="hm">${fmtHM(mins)}</div>${deltaTxt}</div>`;
-      }).join("");
+      };
+
+      const cells = days.map(renderCell).join("");
 
       const style = `<style>
         .strip-wrap {
           overflow-x: auto;
           overflow-y: hidden;
           -webkit-overflow-scrolling: touch;
-          scroll-behavior: smooth;
-          scroll-snap-type: x proximity;
           padding: 3px 2px 8px;
           margin: -3px -2px -8px;
           scrollbar-width: thin;
@@ -440,7 +467,6 @@
           border-radius: 8px;
           padding: 8px 4px 6px;
           line-height: 1.3;
-          scroll-snap-align: start;
         }
         .wcell.today { outline: 2px solid var(--primary-color,#03a9f4); outline-offset: -2px; }
         .wcell.future { outline: 1px dashed currentColor; outline-offset: -3px; }
@@ -466,6 +492,32 @@
       });
       const prev = this.shadowRoot.getElementById("prev"); if (prev) prev.title = lang === "en" ? `Back ${n} days` : `Indietro di ${n} giorni`;
       const next = this.shadowRoot.getElementById("next"); if (next) next.title = lang === "en" ? `Forward ${n} days` : `Avanti di ${n} giorni`;
+
+      const wrap = this.shadowRoot.querySelector(".strip-wrap");
+      const strip = this.shadowRoot.querySelector(".strip");
+      const subEl = this.shadowRoot.querySelector(".sub");
+      let maxDate = days[days.length - 1];
+      let appending = false;
+
+      if (wrap && strip) {
+        wrap.addEventListener("scroll", () => {
+          if (appending) return;
+          if (wrap.scrollLeft + wrap.clientWidth >= wrap.scrollWidth - 120) {
+            appending = true;
+            let addedHtml = "";
+            for (let k = 1; k <= n; k++) {
+              maxDate = addDays(maxDate, 1);
+              addedHtml += renderCell(maxDate);
+            }
+            strip.insertAdjacentHTML("beforeend", addedHtml);
+            if (subEl) {
+              const newRangeLbl = `${days[0].getDate()} ${months[days[0].getMonth()]} → ${maxDate.getDate()} ${months[maxDate.getMonth()]} ${maxDate.getFullYear()}`;
+              subEl.textContent = `${newRangeLbl} · ${modeLabel} · lat ${lat.toFixed(2)}°`;
+            }
+            appending = false;
+          }
+        }, { passive: true });
+      }
     }
   }
 

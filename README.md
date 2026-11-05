@@ -3,7 +3,6 @@
 English | [Italiano](README.it.md)
 
 [![Open your Home Assistant instance and open a repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=tosolini&repository=daylight-heatmap-card&category=plugin)
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tosolini&repository=daylight-heatmap-card&category=plugin)
 
 Tabular view of **available daylight, day by day**, in **hours:minutes** — styled after
 [temperature-heatmap-card](https://github.com/zanac/temperature-heatmap-card), but with no sensors:
@@ -30,10 +29,10 @@ Click the **Open in Marketplace** button above, or go to **Settings** → **Mark
 2. Install, then Settings → Dashboards → ⋮ → Resources → add `/hacsfiles/daylight-heatmap-card/daylight-heatmap-card.js` as **JavaScript Module**.
 
 ### Manual
-Copy `daylight-heatmap-card.js` to `config/www/`, resource `/local/daylight-heatmap-card.js?v=0.4.2` as module.
+Copy `daylight-heatmap-card.js` to `config/www/`, resource `/local/daylight-heatmap-card.js?v=0.4.3` as module.
 
 > HA caches frontend resources: after each update bump `?v=…` and hard-refresh (Ctrl+Shift+R).
-> Check DevTools → Console for `DAYLIGHT-HEATMAP-CARD 0.4.2`. Keep a SINGLE resource: if both `/hacsfiles/…` and `/local/…` remain, the first one loaded wins.
+> Check DevTools → Console for `DAYLIGHT-HEATMAP-CARD 0.4.3`. Keep a SINGLE resource: if both `/hacsfiles/…` and `/local/…` remain, the first one loaded wins.
 
 ## Configuration
 

@@ -30,10 +30,10 @@ Clicca sul pulsante **Apri nel Marketplace** qui sopra, oppure vai in **Impostaz
 2. Installa, poi Impostazioni → Dashboard → ⋮ → Risorse → Aggiungi `/hacsfiles/daylight-heatmap-card/daylight-heatmap-card.js` tipo **JavaScript Module**.
 
 ### Manuale
-Copia `daylight-heatmap-card.js` in `config/www/`, risorsa `/local/daylight-heatmap-card.js?v=0.4.2` tipo modulo.
+Copia `daylight-heatmap-card.js` in `config/www/`, risorsa `/local/daylight-heatmap-card.js?v=0.4.3` tipo modulo.
 
 > Cache di HA: a ogni aggiornamento cambia `?v=…` e ricarica con Ctrl+Maiusc+R.
-> Verifica in Strumenti sviluppo → Console: `DAYLIGHT-HEATMAP-CARD 0.4.2`. Tieni UNA sola risorsa: se restano sia `/hacsfiles/…` che `/local/…`, vince la prima caricata e il fix non si vede.
+> Verifica in Strumenti sviluppo → Console: `DAYLIGHT-HEATMAP-CARD 0.4.3`. Tieni UNA sola risorsa: se restano sia `/hacsfiles/…` che `/local/…`, vince la prima caricata e il fix non si vede.
 
 ## Configurazione
 
